@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Attendance Register</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+:root{
+  --navy:#16213E; --navy2:#1F3057; --slate:#3B5BA5; --gold:#C99A3E; --gold-l:#F3E4C0;
+  --clay:#B5502F; --bg:#F6F4EE; --card:#FFFFFF; --ink:#1A1A1A; --muted:#6B6B6B; --line:#E4E0D5;
+  --ok:#3C7A5E; --ok-bg:#E5F1EA; --bad:#B5502F; --bad-bg:#FBEAE3; --late:#B4862B; --late-bg:#FBF1DC;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){ --bg:#12151C; --card:#1B1F2A; --ink:#EDEBE3; --muted:#9A9A9A; --line:#2A2F3B; --ok-bg:#16261F; --bad-bg:#2A1B16; --late-bg:#2A2216; --gold-l:#2A2416; }
+}
+:root[data-theme="dark"]{ --bg:#12151C; --card:#1B1F2A; --ink:#EDEBE3; --muted:#9A9A9A; --line:#2A2F3B; --ok-bg:#16261F; --bad-bg:#2A1B16; --late-bg:#2A2216; --gold-l:#2A2416; }
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+*{box-sizing:border-box;}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;min-height:100%;}
+h1,h2,h3,.brand{font-family:Georgia,"Iowan Old Style","Palatino Linotype",serif;}
+button{font-family:inherit;cursor:pointer;}
+input,select{font-family:inherit;}
+::-webkit-scrollbar{height:8px;width:8px;}
+::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px;}
+
+/* ---- Login ---- */
+#login{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(160deg,var(--navy),var(--navy2));z-index:50;padding:20px;}
+.login-card{background:var(--card);border-radius:6px;padding:40px 36px;width:100%;max-width:380px;box-shadow:0 20px 50px rgba(0,0,0,.35);}
+.login-card .mark{width:46px;height:46px;border-radius:50%;background:var(--gold);color:var(--navy);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:20px;margin-bottom:18px;}
+.login-card h1{font-size:24px;margin:0 0 4px;}
+.login-card p.sub{color:var(--muted);margin:0 0 24px;font-size:14px;}
+.field{margin-bottom:16px;}
+.field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;letter-spacing:.02em;}
+.field input{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--ink);font-size:15px;}
+.field input:focus{outline:2px solid var(--slate);outline-offset:1px;}
+.login-btn{width:100%;padding:12px;background:var(--navy);color:#fff;border:none;border-radius:5px;font-size:15px;font-weight:600;margin-top:6px;}
+.login-btn:hover{background:var(--navy2);}
+.login-hint{margin-top:16px;font-size:12px;color:var(--muted);text-align:center;}
+.login-err{color:var(--bad);font-size:13px;margin:-8px 0 14px;min-height:1em;}
+
+.theme-toggle{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.3);background:rgba(255,255,255,.08);color:#EDEBE3;font-size:17px;display:flex;align-items:center;justify-content:center;position:absolute;top:calc(20px + env(safe-area-inset-top,0px));right:20px;}
+.theme-toggle:hover{background:rgba(255,255,255,.18);}
+.theme-toggle.inline{position:static;width:34px;height:34px;font-size:15px;border-color:rgba(255,255,255,.25);flex:none;}
+
+/* ---- App shell ---- */
+#app{display:none;min-height:100vh;}
+#app.show{display:flex;}
+.sidebar{width:220px;flex:none;background:var(--navy);color:#EDEBE3;padding:22px 14px;position:sticky;top:0;height:100vh;display:flex;flex-direction:column;}
+.sidebar .brand{font-size:19px;color:#fff;padding:0 10px 22px;border-bottom:1px solid rgba(255,255,255,.12);margin-bottom:16px;}
+.sidebar .brand span{display:block;font-family:-apple-system,sans-serif;font-size:11px;color:var(--gold);letter-spacing:.03em;margin-top:2px;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:6px;color:#C8CCDA;font-size:14px;margin-bottom:3px;background:none;border:none;width:100%;text-align:left;}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff;}
+.nav-item.active{background:var(--gold);color:var(--navy);font-weight:600;}
+.sidebar-foot{margin-top:auto;padding-top:14px;border-top:1px solid rgba(255,255,255,.12);}
+.sidebar-foot .who{font-size:13px;color:#fff;margin-bottom:8px;}
+.logout-btn{width:100%;padding:9px;background:transparent;border:1px solid rgba(255,255,255,.25);color:#EDEBE3;border-radius:5px;font-size:13px;}
+.logout-btn:hover{border-color:var(--clay);color:var(--clay);}
+
+.main{flex:1;min-width:0;padding:26px 30px 60px;}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px;flex-wrap:wrap;gap:12px;}
+.topbar h1{font-size:22px;margin:0;}
+.topbar .today{color:var(--muted);font-size:13px;margin-top:3px;}
+
+.view{display:none;}
+.view.active{display:block;}
+
+/* Dashboard */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px;}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:16px 18px;}
+.stat .num{font-family:Georgia,serif;font-size:30px;line-height:1;}
+.stat .lbl{color:var(--muted);font-size:12.5px;margin-top:6px;}
+.stat.accent .num{color:var(--slate);}
+.stat.ok .num{color:var(--ok);}
+.stat.bad .num{color:var(--bad);}
+
+.panel{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:20px;margin-bottom:20px;}
+.panel h2{font-size:15px;margin:0 0 14px;}
+.bars{display:flex;align-items:flex-end;gap:10px;height:140px;}
+.bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;}
+.bar{width:100%;max-width:34px;background:var(--slate);border-radius:4px 4px 0 0;min-height:2px;}
+.bar-col .pct{font-size:11px;color:var(--muted);margin-bottom:4px;}
+.bar-col .day{font-size:11px;color:var(--muted);margin-top:6px;}
+
+/* Attendance / Records shared */
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:16px;}
+.controls input[type=date],.controls input[type=search],.controls select{padding:9px 11px;border:1px solid var(--line);border-radius:5px;background:var(--card);color:var(--ink);font-size:13.5px;}
+.controls input[type=search]{flex:1;min-width:160px;}
+.btn{padding:9px 15px;border-radius:5px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-size:13.5px;font-weight:500;}
+.btn:hover{border-color:var(--slate);}
+.btn.primary{background:var(--navy);border-color:var(--navy);color:#fff;}
+.btn.primary:hover{background:var(--navy2);}
+.btn.gold{background:var(--gold);border-color:var(--gold);color:var(--navy);font-weight:600;}
+.btn.gold:hover{filter:brightness(1.06);}
+
+.table-wrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--card);}
+table{width:100%;border-collapse:collapse;font-size:13.5px;min-width:600px;}
+th{text-align:left;padding:10px 14px;background:var(--bg);color:var(--muted);font-weight:600;font-size:11.5px;letter-spacing:.02em;border-bottom:1px solid var(--line);position:sticky;top:0;}
+td{padding:9px 14px;border-bottom:1px solid var(--line);}
+tr:last-child td{border-bottom:none;}
+.enroll{color:var(--muted);font-size:12px;}
+.status-btns{display:flex;gap:6px;}
+.sbtn{width:34px;height:30px;border-radius:5px;border:1px solid var(--line);background:var(--bg);color:var(--muted);font-size:12px;font-weight:700;}
+.sbtn.P.on{background:var(--ok-bg);border-color:var(--ok);color:var(--ok);}
+.sbtn.A.on{background:var(--bad-bg);border-color:var(--bad);color:var(--bad);}
+.sbtn.L.on{background:var(--late-bg);border-color:var(--late);color:var(--late);}
+.badge{display:inline-block;padding:2px 9px;border-radius:20px;font-size:11.5px;font-weight:600;}
+.badge.P{background:var(--ok-bg);color:var(--ok);}
+.badge.A{background:var(--bad-bg);color:var(--bad);}
+.badge.L{background:var(--late-bg);color:var(--late);}
+
+.empty{padding:36px;text-align:center;color:var(--muted);font-size:14px;}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(20px);background:var(--navy);color:#fff;padding:11px 20px;border-radius:6px;font-size:13.5px;opacity:0;transition:.25s;pointer-events:none;z-index:60;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+@media (max-width:760px){
+  #app.show{flex-direction:column;}
+  .sidebar{width:100%;height:auto;position:relative;flex-direction:row;overflow-x:auto;padding:12px;align-items:center;}
+  .sidebar .brand{display:none;}
+  .sidebar-foot{margin:0 0 0 auto;padding:0;border:none;display:flex;align-items:center;gap:8px;}
+  .sidebar-foot .who{display:none;}
+  .nav-item{white-space:nowrap;margin-bottom:0;}
+  .main{padding:18px 16px 50px;}
+}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <div class="login-card">
+    <div class="mark">A</div>
+    <h1>Attendance Register</h1>
+    <p class="sub">Sign in to manage class attendance</p>
+    <div class="field"><label>Username</label><input id="luser" autocomplete="username" placeholder="teacher"></div>
+    <div class="field"><label>Password</label><input id="lpass" type="password" autocomplete="current-password" placeholder="••••••••"></div>
+    <div class="login-err" id="lerr"></div>
+    <button class="login-btn" onclick="doLogin()">Sign in</button>
+    <div class="login-hint">Demo access — username <b>teacher</b>, password <b>1234</b></div>
+  </div>
+  <button class="theme-toggle" id="themeToggleLogin" onclick="toggleTheme()" aria-label="Toggle dark mode"></button>
+</div>
+
+<div id="app">
+  <div class="sidebar">
+    <div class="brand">Attendance<span>DMT · CSE Register</span></div>
+    <button class="nav-item active" data-view="dashboard" onclick="showView('dashboard')">Dashboard</button>
+    <button class="nav-item" data-view="mark" onclick="showView('mark')">Mark Attendance</button>
+    <button class="nav-item" data-view="records" onclick="showView('records')">Records</button>
+    <button class="nav-item" data-view="students" onclick="showView('students')">Students</button>
+    <div class="sidebar-foot">
+      <div class="who" id="whoami"></div>
+      <button class="theme-toggle inline" id="themeToggleApp" onclick="toggleTheme()" aria-label="Toggle dark mode"></button>
+      <button class="logout-btn" onclick="doLogout()">Log out</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- Dashboard -->
+    <div class="view active" id="view-dashboard">
+      <div class="topbar"><div><h1>Dashboard</h1><div class="today" id="todayLbl"></div></div></div>
+      <div class="stats" id="statGrid"></div>
+      <div class="panel">
+        <h2>Attendance — last 7 recorded days</h2>
+        <div class="bars" id="barChart"></div>
+      </div>
+      <div class="panel">
+        <h2>Not yet marked today</h2>
+        <div id="pendingBox" class="empty">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Mark attendance -->
+    <div class="view" id="view-mark">
+      <div class="topbar"><div><h1>Mark Attendance</h1><div class="today" id="markSub"></div></div></div>
+      <div class="controls">
+        <input type="date" id="markDate">
+        <input type="search" id="markSearch" placeholder="Search by name or enrollment no.">
+        <button class="btn" onclick="markAll('P')">Mark all present</button>
+        <button class="btn" onclick="markAll('A')">Mark all absent</button>
+        <button class="btn primary" onclick="saveMark()">Save</button>
+      </div>
+      <div class="table-wrap"><table>
+        <thead><tr><th style="width:50px">S.No</th><th>Name</th><th>Enrollment No.</th><th style="width:130px">Status</th></tr></thead>
+        <tbody id="markBody"></tbody>
+      </table></div>
+    </div>
+
+    <!-- Records -->
+    <div class="view" id="view-records">
+      <div class="topbar"><div><h1>Attendance Records</h1><div class="today">Browse and export saved days</div></div></div>
+      <div class="controls">
+        <select id="recDate"></select>
+        <span style="flex:1"></span>
+        <button class="btn gold" onclick="exportExcel()">Export to Excel</button>
+      </div>
+      <div id="recordsArea"></div>
+    </div>
+
+    <!-- Students -->
+    <div class="view" id="view-students">
+      <div class="topbar"><div><h1>Students</h1><div class="today" id="studSub"></div></div></div>
+      <div class="controls"><input type="search" id="studSearch" placeholder="Search by name or enrollment no."></div>
+      <div class="table-wrap"><table>
+        <thead><tr><th style="width:50px">S.No</th><th>Name</th><th>Enrollment No.</th><th style="width:110px">Overall %</th></tr></thead>
+        <tbody id="studBody"></tbody>
+      </table></div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STUDENTS = [[1,"2310DMTCSE15254","ASHLESHA PANDA"],[2,"2310DMTCSE15255","ATHARV PARIHAR"],[3,"2310DMTCSE15256","AVDHESH SAHU"],[4,"2310DMTCSE15257","AYUSH ORIYA"],[5,"2310DMTCSE15258","CHAYAN CHOUDHARY"],[6,"2310DMTCSE15259","DARSH KHANDELWAL"],[7,"2310DMTCSE15260","DEVANSHI SHARMA"],[8,"2310DMTCSE15261","DHEERAJ MAKWANA"],[9,"2310DMTCSE15263","DIVYANSHI CHOUHAN"],[10,"2310DMTCSE15264","GOUTAM BIRLA"],[11,"2310DMTCSE15265","HARDIK NAMDEV"],[12,"2310DMTCSE15266","HARIOM GEHLOD"],[13,"2310DMTCSE15267","HARSHIT VERMA"],[14,"2310DMTCSE15268","HARSHITA KUMAWAT"],[15,"2310DMTCSE15269","JAHANVI MAYLA"],[16,"2310DMTCSE15270","JATIN KANPURE"],[17,"2310DMTCSE15272","JAY KUMAR GOUD"],[18,"2310DMTCSE15273","JAY PATEL"],[19,"2310DMTCSE15274","JAYESH KANNOJIYA"],[20,"2310DMTCSE15275","KARAN CHOUHAN"],[21,"2310DMTCSE15276","KASHISH KATIYAR"],[22,"2310DMTCSE15277","KHUSHI NATHAWAT"],[23,"2310DMTCSE15278","KRATI RIMJHA"],[24,"2310DMTCSE15279","KRATIKA CHOUKSEY"],[25,"2310DMTCSE15280","KRISH SENDHAV"],[26,"2310DMTCSE15281","KRISHNA MUKATI"],[27,"2310DMTCSE15282","KULDEEP MALVIYA"],[28,"2310DMTCSE15284","LALIT KUMAR DANGI"],[29,"2310DMTCSE15285","MADHUR SAMVATSAR"],[30,"2310DMTCSE15286","MANASVI RATHORE"],[31,"2310DMTCSE15287","MEETANSHEE GUPTA"],[32,"2310DMTCSE15290","MRITUNJAY GAUR"],[33,"2310DMTCSE15291","NAVDHA DHANOTIYA"],[34,"2310DMTCSE15292","NIHAR SOLANKI"],[35,"2310DMTCSE15294","OM SHIVHARE"],[36,"2310DMTCSE15295","PAARTH SAXENA"],[37,"2310DMTCSE15296","PANKAJ CHOUHAN"],[38,"2310DMTCSE15299","PRAKHAR GUPTA"],[39,"2310DMTCSE15300","PRAKHAR PARIHAR"],[40,"2310DMTCSE15302","PRIYA PATIDAR"],[41,"2310DMTCSE15303","PRIYAM SHARMA"],[42,"2310DMTCSE15305","PRIYANSHU CHANDRAVANSHI"],[43,"2310DMTCSE15306","PURAAN LAUWANSHI"],[44,"2310DMTCSE15307","PURVI PARASHAR"],[45,"2310DMTCSE15308","PUSHPRAJ BUNDELA"],[46,"2310DMTCSE15309","RACHIT HADA"],[47,"2310DMTCSE15310","RASHI PUROHIT"],[48,"2310DMTCSE15311","RUDRA JADHAV"],[49,"2310DMTCSE15312","RUDRANSH BANSAL"],[50,"2310DMTCSE15313","SAHIL CHOUDHARY"],[51,"2310DMTCSE15314","SAKSHI PATIL"],[52,"2310DMTCSE15315","SAMIA KHAN"],[53,"2310DMTCSE15316","SAMRADHI GUPTA"],[54,"2310DMTCSE15317","SANIDHYA SARODE"],[55,"2310DMTCSE15318","SAWAN SINGH MAKWANA"],[56,"2310DMTCSE15319","SHOBHIT MOYADE"],[57,"2310DMTCSE15320","SHRUTIKA PATIDAR"],[58,"2310DMTCSE15321","SHUBHRANSHU SAHU"],[59,"2310DMTCSE15322","SMRUTI CHOUDHARY"],[60,"2310DMTCSE15323","SOJAL DESHMUKH"],[61,"2310DMTCSE15324","SWEETI KHATOD"],[62,"2310DMTCSE15325","TANISHA RAJESH CHOUKSEY"],[63,"2310DMTCSE15326","TANISHA YADAV"],[64,"2310DMTCSE15327","TANISHK PATIDAR"],[65,"2310DMTCSE15328","TANISHQ JAISWAL"],[66,"2310DMTCSE15329","TANMAY RAMPURKAR"],[67,"2310DMTCSE15331","UMANG SOGANI"],[68,"2310DMTCSE15332","VEER BADJATYA"],[69,"2310DMTCSE15333","VIBHORE YADAV"],[70,"2310DMTCSE15334","VINITA JOSHI"],[71,"2210DMTCSE13194","HARSHVARDHAN DESHMUKH"],[72,"2210DMTCSE11972","Abhinav Yadav"],[73,"2210DMTCSE11977","Akeeshdixon"],[74,"2210DMTCSE11986","ARNAV BHOKRE"],[75,"2210DMTCSE11990","Danish Ansari"],[76,"2210DMTCSE12023","Manish devliya"],[77,"2210DMTCSE12047","Sneha patidar"],[78,"2210DMTCSE12047","Suryansh Singh Jadon"]]
+  .map(r=>({sno:r[0],enroll:r[1],name:r[2]}));
+
+let DATA = {}; // { "YYYY-MM-DD": { enroll: "P"|"A"|"L" } }
+let markState = {};
+
+function todayStr(){ const d=new Date(); return d.toISOString().slice(0,10); }
+function fmtDate(s){ const d=new Date(s+"T00:00:00"); return d.toLocaleDateString(undefined,{weekday:'short',year:'numeric',month:'short',day:'numeric'}); }
+function toast(msg){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(window._tt); window._tt=setTimeout(()=>t.classList.remove('show'),2200); }
+
+function loadData(){
+  try{ const raw = localStorage.getItem('att_records'); DATA = raw ? JSON.parse(raw) : {}; }catch(e){ DATA = {}; }
+}
+function saveData(){
+  try{ localStorage.setItem('att_records', JSON.stringify(DATA)); }catch(e){ toast('Could not save — storage unavailable'); }
+}
+
+/* ---------- Theme ---------- */
+function applyTheme(t){
+  if(t==='dark' || t==='light'){ document.documentElement.setAttribute('data-theme', t); }
+  else { document.documentElement.removeAttribute('data-theme'); }
+  const isDark = t==='dark' || (t!=='light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const icon = isDark ? '☀' : '☾';
+  ['themeToggleLogin','themeToggleApp'].forEach(id=>{ const b=document.getElementById(id); if(b) b.textContent=icon; });
+}
+function toggleTheme(){
+  let cur=null;
+  try{ cur = localStorage.getItem('att_theme'); }catch(e){}
+  const isDark = cur==='dark' || (cur!=='light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
+  const next = isDark ? 'light' : 'dark';
+  try{ localStorage.setItem('att_theme', next); }catch(e){}
+  applyTheme(next);
+}
+(function initTheme(){
+  let saved=null;
+  try{ saved = localStorage.getItem('att_theme'); }catch(e){}
+  applyTheme(saved);
+})();
+
+/* ---------- Auth ---------- */
+function doLogin(){
+  const u = document.getElementById('luser').value.trim();
+  const p = document.getElementById('lpass').value;
+  const err = document.getElementById('lerr');
+  if(u.toLowerCase()==='teacher' && p==='1234'){
+    err.textContent='';
+    try{ localStorage.setItem('att_session', u); }catch(e){}
+    enterApp(u);
+  } else {
+    err.textContent = 'Incorrect username or password.';
+  }
+}
+document.getElementById('lpass').addEventListener('keydown', e=>{ if(e.key==='Enter') doLogin(); });
+function doLogout(){
+  try{ localStorage.removeItem('att_session'); }catch(e){}
+  document.getElementById('app').classList.remove('show');
+  document.getElementById('login').style.display='flex';
+}
+function enterApp(user){
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').classList.add('show');
+  document.getElementById('whoami').textContent = 'Signed in as ' + user;
+  init();
+}
+
+/* ---------- Nav ---------- */
+function showView(name){
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active', b.dataset.view===name));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+name).classList.add('active');
+  if(name==='dashboard') renderDashboard();
+  if(name==='records') renderRecords();
+  if(name==='students') renderStudents();
+}
+
+/* ---------- Dashboard ---------- */
+function renderDashboard(){
+  document.getElementById('todayLbl').textContent = fmtDate(todayStr());
+  const dates = Object.keys(DATA).sort();
+  const totalDays = dates.length;
+  const today = DATA[todayStr()] || {};
+  const markedToday = Object.keys(today).length;
+  const presentToday = Object.values(today).filter(s=>s==='P').length;
+  const pct = markedToday ? Math.round(presentToday/markedToday*100) : 0;
+
+  document.getElementById('statGrid').innerHTML = `
+    <div class="stat accent"><div class="num">${STUDENTS.length}</div><div class="lbl">Total students</div></div>
+    <div class="stat"><div class="num">${totalDays}</div><div class="lbl">Days recorded</div></div>
+    <div class="stat ok"><div class="num">${markedToday?pct+'%':'—'}</div><div class="lbl">Present today</div></div>
+    <div class="stat bad"><div class="num">${STUDENTS.length-markedToday}</div><div class="lbl">Unmarked today</div></div>`;
+
+  const last7 = dates.slice(-7);
+  const bars = last7.map(d=>{
+    const rec = DATA[d]; const vals = Object.values(rec);
+    const p = vals.length ? Math.round(vals.filter(v=>v==='P').length/vals.length*100) : 0;
+    const day = new Date(d+"T00:00:00").toLocaleDateString(undefined,{day:'2-digit',month:'short'});
+    return `<div class="bar-col"><div class="pct">${p}%</div><div class="bar" style="height:${Math.max(p,3)}%"></div><div class="day">${day}</div></div>`;
+  }).join('');
+  document.getElementById('barChart').innerHTML = bars || '<div class="empty">No attendance recorded yet — mark today to see the trend.</div>';
+
+  const pendingNames = STUDENTS.filter(s=>!(s.enroll in today)).slice(0,8).map(s=>s.name);
+  const box = document.getElementById('pendingBox');
+  if(markedToday===STUDENTS.length && markedToday>0){ box.className='empty'; box.textContent="Everyone marked for today. Nice."; }
+  else if(pendingNames.length===0){ box.className='empty'; box.textContent="No attendance marked for today yet."; }
+  else { box.className=''; box.innerHTML = pendingNames.map(n=>`<span class="badge" style="background:var(--gold-l);color:var(--navy);margin:3px 6px 3px 0">${n}</span>`).join('') + (STUDENTS.length-markedToday>8?` <span style="color:var(--muted);font-size:12.5px">+${STUDENTS.length-markedToday-8} more</span>`:''); }
+}
+
+/* ---------- Mark attendance ---------- */
+function initMarkDate(){
+  const inp = document.getElementById('markDate');
+  inp.value = todayStr();
+  inp.addEventListener('change', loadMarkDay);
+}
+function loadMarkDay(){
+  const d = document.getElementById('markDate').value || todayStr();
+  document.getElementById('markSub').textContent = fmtDate(d);
+  markState = Object.assign({}, DATA[d] || {});
+  renderMarkTable();
+}
+function renderMarkTable(){
+  const q = (document.getElementById('markSearch').value||'').toLowerCase();
+  const rows = STUDENTS.filter(s=>!q || s.name.toLowerCase().includes(q) || s.enroll.toLowerCase().includes(q));
+  document.getElementById('markBody').innerHTML = rows.map(s=>{
+    const cur = markState[s.enroll];
+    return `<tr><td>${s.sno}</td><td>${s.name}</td><td class="enroll">${s.enroll}</td><td>
+      <div class="status-btns">
+        <button class="sbtn P ${cur==='P'?'on':''}" onclick="setMark('${s.enroll}','P')">P</button>
+        <button class="sbtn A ${cur==='A'?'on':''}" onclick="setMark('${s.enroll}','A')">A</button>
+        <button class="sbtn L ${cur==='L'?'on':''}" onclick="setMark('${s.enroll}','L')">L</button>
+      </div></td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="empty">No students match your search.</td></tr>';
+}
+function setMark(enroll, status){
+  markState[enroll] = markState[enroll]===status ? undefined : status;
+  if(markState[enroll]===undefined) delete markState[enroll];
+  renderMarkTable();
+}
+function markAll(status){
+  STUDENTS.forEach(s=> markState[s.enroll] = status);
+  renderMarkTable();
+  toast('All marked ' + (status==='P'?'present':'absent') + ' — remember to Save');
+}
+function saveMark(){
+  const d = document.getElementById('markDate').value || todayStr();
+  DATA[d] = Object.assign({}, markState);
+  saveData();
+  toast('Attendance saved for ' + fmtDate(d));
+  populateRecordDates();
+}
+
+/* ---------- Records ---------- */
+function populateRecordDates(){
+  const sel = document.getElementById('recDate');
+  const dates = Object.keys(DATA).sort().reverse();
+  sel.innerHTML = dates.length ? dates.map(d=>`<option value="${d}">${fmtDate(d)}</option>`).join('') : '<option value="">No records yet</option>';
+}
+function renderRecords(){
+  populateRecordDates();
+  document.getElementById('recDate').onchange = renderRecordTable;
+  renderRecordTable();
+}
+function renderRecordTable(){
+  const d = document.getElementById('recDate').value;
+  const area = document.getElementById('recordsArea');
+  if(!d || !DATA[d]){ area.innerHTML = '<div class="panel empty">No saved attendance to show. Mark attendance first.</div>'; return; }
+  const rec = DATA[d];
+  const vals = Object.values(rec);
+  const p = vals.filter(v=>v==='P').length, a = vals.filter(v=>v==='A').length, l = vals.filter(v=>v==='L').length;
+  const rows = STUDENTS.map(s=>{
+    const st = rec[s.enroll] || '—';
+    const badge = st==='—' ? '<span style="color:var(--muted)">Not marked</span>' : `<span class="badge ${st}">${st==='P'?'Present':st==='A'?'Absent':'Late'}</span>`;
+    return `<tr><td>${s.sno}</td><td>${s.name}</td><td class="enroll">${s.enroll}</td><td>${badge}</td></tr>`;
+  }).join('');
+  area.innerHTML = `
+    <div class="stats" style="margin-bottom:16px">
+      <div class="stat ok"><div class="num">${p}</div><div class="lbl">Present</div></div>
+      <div class="stat bad"><div class="num">${a}</div><div class="lbl">Absent</div></div>
+      <div class="stat"><div class="num">${l}</div><div class="lbl">Late</div></div>
+    </div>
+    <div class="table-wrap"><table><thead><tr><th style="width:50px">S.No</th><th>Name</th><th>Enrollment No.</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+/* ---------- Students / overall % ---------- */
+function overallPct(enroll){
+  const days = Object.keys(DATA);
+  if(!days.length) return null;
+  let marked=0, present=0;
+  days.forEach(d=>{ const st=DATA[d][enroll]; if(st){ marked++; if(st==='P') present++; } });
+  return marked ? Math.round(present/marked*100) : null;
+}
+function renderStudents(){
+  document.getElementById('studSub').textContent = STUDENTS.length + ' students enrolled';
+  document.getElementById('studSearch').oninput = renderStudentTable;
+  renderStudentTable();
+}
+function renderStudentTable(){
+  const q = (document.getElementById('studSearch').value||'').toLowerCase();
+  const rows = STUDENTS.filter(s=>!q || s.name.toLowerCase().includes(q) || s.enroll.toLowerCase().includes(q));
+  document.getElementById('studBody').innerHTML = rows.map(s=>{
+    const pct = overallPct(s.enroll);
+    const color = pct===null ? 'var(--muted)' : pct>=75 ? 'var(--ok)' : 'var(--bad)';
+    return `<tr><td>${s.sno}</td><td>${s.name}</td><td class="enroll">${s.enroll}</td><td style="color:${color};font-weight:600">${pct===null?'—':pct+'%'}</td></tr>`;
+  }).join('') || '<tr><td colspan="4" class="empty">No students match your search.</td></tr>';
+}
+
+/* ---------- Export to Excel ---------- */
+async function exportExcel(){
+  const dates = Object.keys(DATA).sort();
+  if(!dates.length){ toast('No attendance data to export yet'); return; }
+  const wb = XLSX.utils.book_new();
+
+  const summaryRows = [['S.No','Enrollment No.','Name', ...dates.map(fmtDate), 'Overall %']];
+  STUDENTS.forEach(s=>{
+    const row = [s.sno, s.enroll, s.name];
+    dates.forEach(d=> row.push(DATA[d][s.enroll] || ''));
+    const pct = overallPct(s.enroll);
+    row.push(pct===null?'':pct+'%');
+    summaryRows.push(row);
+  });
+  const ws1 = XLSX.utils.aoa_to_sheet(summaryRows);
+  ws1['!cols'] = [{wch:6},{wch:18},{wch:24},...dates.map(()=>({wch:10})),{wch:10}];
+  XLSX.utils.book_append_sheet(wb, ws1, 'Summary');
+
+  dates.forEach(d=>{
+    const rec = DATA[d];
+    const rows = [['S.No','Enrollment No.','Name','Status']];
+    STUDENTS.forEach(s=> rows.push([s.sno, s.enroll, s.name, rec[s.enroll]==='P'?'Present':rec[s.enroll]==='A'?'Absent':rec[s.enroll]==='L'?'Late':'Not marked']));
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+    ws['!cols'] = [{wch:6},{wch:18},{wch:24},{wch:12}];
+    XLSX.utils.book_append_sheet(wb, ws, d.slice(0,31));
+  });
+
+  const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+  const blob = new Blob([wbout], {type:'application/octet-stream'});
+  const filename = 'attendance_export_' + todayStr() + '.xlsx';
+
+  try{
+    const downloads = await claude.use('downloads');
+    if(downloads){
+      await downloads.save({filename, data: blob});
+      toast('Export ready — check the save prompt');
+      return;
+    }
+  }catch(e){}
+  // Fallback (e.g. preview/editor context): trigger a browser download directly
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+  toast('Excel file downloaded');
+}
+
+/* ---------- Init ---------- */
+function init(){
+  loadData();
+  initMarkDate();
+  document.getElementById('markSearch').addEventListener('input', renderMarkTable);
+  loadMarkDay();
+  renderDashboard();
+}
+
+(function boot(){
+  let session=null;
+  try{ session = localStorage.getItem('att_session'); }catch(e){}
+  if(session) enterApp(session);
+})();
+</script>
+</body>
+</html>
